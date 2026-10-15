@@ -1,3 +1,4 @@
+```groovy
 pipeline {
     agent any
 
@@ -37,11 +38,15 @@ pipeline {
                     passwordVariable: 'DH_PASSWORD'
                 )]) {
                     bat '''
-                        "%DOCKER%" login -u "%DH_USER%" --password-stdin
-                    '''.replace('--password-stdin', '--password-stdin') 
-                    bat 'echo %DH_PASSWORD% | "%DOCKER%" login -u "%DH_USER%" --password-stdin'
-                    bat '"%DOCKER%" push %IMAGE_NAME%:%BUILD_NUMBER%'
-                    bat '"%DOCKER%" push %IMAGE_NAME%:latest'
+                        echo %DH_PASSWORD% | "%DOCKER%" login -u "%DH_USER%" --password-stdin
+                        if errorlevel 1 exit /b 1
+
+                        "%DOCKER%" push %IMAGE_NAME%:%BUILD_NUMBER%
+                        if errorlevel 1 exit /b 1
+
+                        "%DOCKER%" push %IMAGE_NAME%:latest
+                        if errorlevel 1 exit /b 1
+                    '''
                 }
             }
         }
@@ -56,14 +61,16 @@ pipeline {
                         )]) {
                             bat '''
                                 set "KUBECONFIG=%KUBECONFIG_FILE%"
+
                                 kubectl set image deployment/%KUBE_DEPLOYMENT% %KUBE_CONTAINER%=%IMAGE_NAME%:%BUILD_NUMBER%
                                 if errorlevel 1 exit /b 1
+
                                 kubectl rollout status deployment/%KUBE_DEPLOYMENT% --timeout=120s
                                 if errorlevel 1 exit /b 1
                             '''
                         }
                     } catch (Exception e) {
-                        echo 'Deployment failed. Attempting rollback.'
+                        echo 'Deployment failed. Attempting automatic rollback.'
 
                         withCredentials([file(
                             credentialsId: 'kubernetes-config',
@@ -71,9 +78,12 @@ pipeline {
                         )]) {
                             bat '''
                                 set "KUBECONFIG=%KUBECONFIG_FILE%"
+
                                 kubectl rollout undo deployment/%KUBE_DEPLOYMENT%
                                 if errorlevel 1 exit /b 1
+
                                 kubectl rollout status deployment/%KUBE_DEPLOYMENT% --timeout=120s
+                                if errorlevel 1 exit /b 1
                             '''
                         }
 
@@ -91,6 +101,7 @@ pipeline {
                 )]) {
                     bat '''
                         set "KUBECONFIG=%KUBECONFIG_FILE%"
+
                         kubectl get deployments
                         kubectl get pods
                         kubectl get services
@@ -104,6 +115,7 @@ pipeline {
         success {
             echo 'Student Placement Portal deployed successfully!'
         }
+
         failure {
             echo 'Pipeline failed. Check Console Output for the exact error.'
         }
