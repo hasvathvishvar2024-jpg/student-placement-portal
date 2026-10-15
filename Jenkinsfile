@@ -2,49 +2,71 @@ pipeline {
     agent any
 
     environment {
+        DOCKER_IMAGE = '24mis0111/student-placement'
         DOCKER = 'C:\\Users\\ASUS\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
-        IMAGE_NAME = '24mis0111/student-placement'
-        KUBE_DEPLOYMENT = 'student-placement'
-        KUBE_CONTAINER = 'student-placement'
+        KUBECTL = 'C:\\Users\\ASUS\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\kubectl.exe'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Clone Code') {
             steps {
-                echo 'Source code checked out from GitHub.'
+                git branch: 'main',
+                    url: 'https://github.com/hasvathvishvar2024-jpg/student-placement-portal.git'
             }
         }
 
         stage('Check Docker') {
             steps {
-                bat '"%DOCKER%" --version'
-                bat '"%DOCKER%" info'
+                bat '''
+                    echo Checking Docker...
+                    "%DOCKER%" --version
+                    if errorlevel 1 exit /b 1
+                '''
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build New Docker Image') {
             steps {
-                bat '"%DOCKER%" build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
-                bat '"%DOCKER%" tag %IMAGE_NAME%:%BUILD_NUMBER% %IMAGE_NAME%:latest'
+                bat '''
+                    echo Building Student Placement Portal image...
+
+                    "%DOCKER%" build -t %DOCKER_IMAGE%:%BUILD_NUMBER% .
+                    if errorlevel 1 exit /b 1
+
+                    "%DOCKER%" tag %DOCKER_IMAGE%:%BUILD_NUMBER% %DOCKER_IMAGE%:latest
+                    if errorlevel 1 exit /b 1
+
+                    echo Docker image built successfully.
+                '''
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Push New Image') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials',
-                    usernameVariable: 'DH_USER',
-                    passwordVariable: 'DH_PASSWORD'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
                     bat '''
-                        echo %DH_PASSWORD% | "%DOCKER%" login -u "%DH_USER%" --password-stdin
+                        echo Logging in to Docker Hub...
+
+                        echo %DOCKER_PASSWORD% | "%DOCKER%" login -u "%DOCKER_USER%" --password-stdin
                         if errorlevel 1 exit /b 1
 
-                        "%DOCKER%" push %IMAGE_NAME%:%BUILD_NUMBER%
+                        echo Pushing versioned image...
+
+                        "%DOCKER%" push %DOCKER_IMAGE%:%BUILD_NUMBER%
                         if errorlevel 1 exit /b 1
 
-                        "%DOCKER%" push %IMAGE_NAME%:latest
+                        echo Pushing latest image...
+
+                        "%DOCKER%" push %DOCKER_IMAGE%:latest
                         if errorlevel 1 exit /b 1
+
+                        echo Docker image pushed successfully.
                     '''
                 }
             }
@@ -54,39 +76,56 @@ pipeline {
             steps {
                 script {
                     try {
-                        withCredentials([file(
-                            credentialsId: 'kubernetes-config',
-                            variable: 'KUBECONFIG_FILE'
-                        )]) {
+                        withCredentials([
+                            file(
+                                credentialsId: 'kubernetes-config',
+                                variable: 'KUBECONFIG_FILE'
+                            )
+                        ]) {
                             bat '''
-                                set "KUBECONFIG=%KUBECONFIG_FILE%"
+                                echo Applying Kubernetes configuration...
 
-                                kubectl set image deployment/%KUBE_DEPLOYMENT% %KUBE_CONTAINER%=%IMAGE_NAME%:%BUILD_NUMBER%
+                                "%KUBECTL%" --kubeconfig "%KUBECONFIG_FILE%" apply -f deployment.yaml
                                 if errorlevel 1 exit /b 1
 
-                                kubectl rollout status deployment/%KUBE_DEPLOYMENT% --timeout=120s
+                                echo Updating Student Placement Portal image...
+
+                                "%KUBECTL%" --kubeconfig "%KUBECONFIG_FILE%" set image deployment/student-placement student-placement=%DOCKER_IMAGE%:%BUILD_NUMBER%
                                 if errorlevel 1 exit /b 1
+
+                                echo Waiting for rollout...
+
+                                "%KUBECTL%" --kubeconfig "%KUBECONFIG_FILE%" rollout status deployment/student-placement --timeout=120s
+                                if errorlevel 1 exit /b 1
+
+                                echo Deployment completed successfully.
                             '''
                         }
                     } catch (Exception e) {
-                        echo 'Deployment failed. Attempting automatic rollback.'
+                        echo 'Deployment failed. Starting automatic rollback.'
 
-                        withCredentials([file(
-                            credentialsId: 'kubernetes-config',
-                            variable: 'KUBECONFIG_FILE'
-                        )]) {
+                        withCredentials([
+                            file(
+                                credentialsId: 'kubernetes-config',
+                                variable: 'KUBECONFIG_FILE'
+                            )
+                        ]) {
                             bat '''
-                                set "KUBECONFIG=%KUBECONFIG_FILE%"
+                                echo Rolling back to the previous stable version...
 
-                                kubectl rollout undo deployment/%KUBE_DEPLOYMENT%
+                                "%KUBECTL%" --kubeconfig "%KUBECONFIG_FILE%" rollout undo deployment/student-placement
                                 if errorlevel 1 exit /b 1
 
-                                kubectl rollout status deployment/%KUBE_DEPLOYMENT% --timeout=120s
+                                echo Waiting for rollback to complete...
+
+                                "%KUBECTL%" --kubeconfig "%KUBECONFIG_FILE%" rollout status deployment/student-placement --timeout=120s
                                 if errorlevel 1 exit /b 1
+
+                                echo Previous stable version restored.
                             '''
                         }
 
-                        error('Deployment failed. Rollback attempted.')
+                        error('New deployment failed. Automatic rollback was attempted.')
                     }
                 }
             }
@@ -94,16 +133,35 @@ pipeline {
 
         stage('Verify Deployment') {
             steps {
-                withCredentials([file(
-                    credentialsId: 'kubernetes-config',
-                    variable: 'KUBECONFIG_FILE'
-                )]) {
+                withCredentials([
+                    file(
+                        credentialsId: 'kubernetes-config',
+                        variable: 'KUBECONFIG_FILE'
+                    )
+                ]) {
                     bat '''
-                        set "KUBECONFIG=%KUBECONFIG_FILE%"
+                        echo ======================================
+                        echo STUDENT PLACEMENT PORTAL VERIFICATION
+                        echo ======================================
 
-                        kubectl get deployments
-                        kubectl get pods
-                        kubectl get services
+                        echo Deployment status:
+
+                        "%KUBECTL%" --kubeconfig "%KUBECONFIG_FILE%" get deployment student-placement
+                        if errorlevel 1 exit /b 1
+
+                        echo Pod status:
+
+                        "%KUBECTL%" --kubeconfig "%KUBECONFIG_FILE%" get pods -o wide
+                        if errorlevel 1 exit /b 1
+
+                        echo Service status:
+
+                        "%KUBECTL%" --kubeconfig "%KUBECONFIG_FILE%" get service student-placement-service
+                        if errorlevel 1 exit /b 1
+
+                        echo ======================================
+                        echo VERIFICATION COMPLETED
+                        echo ======================================
                     '''
                 }
             }
@@ -112,11 +170,11 @@ pipeline {
 
     post {
         success {
-            echo 'Student Placement Portal deployed successfully!'
+            echo 'Student Placement Portal pipeline completed successfully.'
         }
 
         failure {
-            echo 'Pipeline failed. Check Console Output for the exact error.'
+            echo 'Pipeline failed. Check Console Output for details.'
         }
     }
 }
