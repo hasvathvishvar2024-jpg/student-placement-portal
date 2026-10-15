@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     environment {
+        DOCKER = 'C:\\Users\\ASUS\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
         IMAGE_NAME = '24mis0111/student-placement'
         KUBE_DEPLOYMENT = 'student-placement'
         KUBE_CONTAINER = 'student-placement'
@@ -10,15 +11,21 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/hasvathvishvar2024-jpg/student-placement-portal.git'
+                echo 'Source code checked out from GitHub.'
+            }
+        }
+
+        stage('Check Docker') {
+            steps {
+                bat '"%DOCKER%" --version'
+                bat '"%DOCKER%" info'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                bat 'docker build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
-                bat 'docker tag %IMAGE_NAME%:%BUILD_NUMBER% %IMAGE_NAME%:latest'
+                bat '"%DOCKER%" build -t %IMAGE_NAME%:%BUILD_NUMBER% .'
+                bat '"%DOCKER%" tag %IMAGE_NAME%:%BUILD_NUMBER% %IMAGE_NAME%:latest'
             }
         }
 
@@ -29,9 +36,12 @@ pipeline {
                     usernameVariable: 'DH_USER',
                     passwordVariable: 'DH_PASSWORD'
                 )]) {
-                    bat 'docker login -u %DH_USER% -p %DH_PASSWORD%'
-                    bat 'docker push %IMAGE_NAME%:%BUILD_NUMBER%'
-                    bat 'docker push %IMAGE_NAME%:latest'
+                    bat '''
+                        "%DOCKER%" login -u "%DH_USER%" --password-stdin
+                    '''.replace('--password-stdin', '--password-stdin') 
+                    bat 'echo %DH_PASSWORD% | "%DOCKER%" login -u "%DH_USER%" --password-stdin'
+                    bat '"%DOCKER%" push %IMAGE_NAME%:%BUILD_NUMBER%'
+                    bat '"%DOCKER%" push %IMAGE_NAME%:latest'
                 }
             }
         }
@@ -45,7 +55,7 @@ pipeline {
                             variable: 'KUBECONFIG_FILE'
                         )]) {
                             bat '''
-                                set KUBECONFIG=%KUBECONFIG_FILE%
+                                set "KUBECONFIG=%KUBECONFIG_FILE%"
                                 kubectl set image deployment/%KUBE_DEPLOYMENT% %KUBE_CONTAINER%=%IMAGE_NAME%:%BUILD_NUMBER%
                                 if errorlevel 1 exit /b 1
                                 kubectl rollout status deployment/%KUBE_DEPLOYMENT% --timeout=120s
@@ -53,20 +63,21 @@ pipeline {
                             '''
                         }
                     } catch (Exception e) {
-                        echo 'Deployment failed. Rolling back to the previous revision.'
+                        echo 'Deployment failed. Attempting rollback.'
 
                         withCredentials([file(
                             credentialsId: 'kubernetes-config',
                             variable: 'KUBECONFIG_FILE'
                         )]) {
                             bat '''
-                                set KUBECONFIG=%KUBECONFIG_FILE%
+                                set "KUBECONFIG=%KUBECONFIG_FILE%"
                                 kubectl rollout undo deployment/%KUBE_DEPLOYMENT%
+                                if errorlevel 1 exit /b 1
                                 kubectl rollout status deployment/%KUBE_DEPLOYMENT% --timeout=120s
                             '''
                         }
 
-                        error('Deployment failed. Rollback was attempted.')
+                        error('Deployment failed. Rollback attempted.')
                     }
                 }
             }
@@ -79,7 +90,7 @@ pipeline {
                     variable: 'KUBECONFIG_FILE'
                 )]) {
                     bat '''
-                        set KUBECONFIG=%KUBECONFIG_FILE%
+                        set "KUBECONFIG=%KUBECONFIG_FILE%"
                         kubectl get deployments
                         kubectl get pods
                         kubectl get services
@@ -94,7 +105,7 @@ pipeline {
             echo 'Student Placement Portal deployed successfully!'
         }
         failure {
-            echo 'Pipeline failed. Check the console output and rollback logs.'
+            echo 'Pipeline failed. Check Console Output for the exact error.'
         }
     }
 }
