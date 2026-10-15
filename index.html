@@ -1,0 +1,163 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Placement Portal</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f6fb;
+            color: #243247;
+        }
+
+        header {
+            background: #153b70;
+            color: white;
+            padding: 25px;
+            text-align: center;
+        }
+
+        nav {
+            background: #24518b;
+            padding: 14px;
+            text-align: center;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin: 0 15px;
+        }
+
+        main {
+            max-width: 1000px;
+            margin: 25px auto;
+            padding: 15px;
+        }
+
+        .stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .card {
+            flex: 1;
+            min-width: 200px;
+            background: white;
+            padding: 22px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px #ccd3df;
+        }
+
+        h2 {
+            color: #153b70;
+        }
+
+        .drive {
+            background: white;
+            padding: 18px;
+            margin: 12px 0;
+            border-left: 5px solid #24518b;
+            border-radius: 6px;
+        }
+
+        .tag {
+            color: #167443;
+            font-weight: bold;
+        }
+
+        footer {
+            background: #153b70;
+            color: white;
+            text-align: center;
+            padding: 18px;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Student Placement Portal</h1>
+        <p>Your Gateway to Career Opportunities</p>
+    </header>
+
+    <nav>
+        <a href="#statistics">Statistics</a>
+        <a href="#companies">Companies</a>
+        <a href="#drives">Recruitment Drives</a>
+    </nav>
+
+    <main>
+        <section>
+            <h2>Welcome, Students!</h2>
+            <p>Explore placement opportunities, company profiles,
+            eligibility criteria and upcoming campus recruitment drives.</p>
+        </section>
+
+        <section id="statistics">
+            <h2>Placement Statistics</h2>
+            <div class="stats">
+                <div class="card">
+                    <h3>850+</h3>
+                    <p>Students Placed</p>
+                </div>
+                <div class="card">
+                    <h3>120+</h3>
+                    <p>Recruiting Companies</p>
+                </div>
+                <div class="card">
+                    <h3>₹12 LPA</h3>
+                    <p>Highest Package</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="companies">
+            <h2>Company Profiles</h2>
+            <div class="card">
+                <h3>TCS</h3>
+                <p>Eligibility: Relevant degree and required academic criteria.</p>
+            </div>
+            <div class="card">
+                <h3>Infosys</h3>
+                <p>Eligibility: Eligible students from participating programs.</p>
+            </div>
+            <div class="card">
+                <h3>Accenture</h3>
+                <p>Eligibility: Meet the company's announced recruitment criteria.</p>
+            </div>
+        </section>
+
+        <section id="drives">
+            <h2>Upcoming Recruitment Drives</h2>
+            <div class="drive">
+                <h3>TCS Campus Recruitment</h3>
+                <p>Date: 25 November 2026</p>
+                <p class="tag">Registration Open</p>
+            </div>
+            <div class="drive">
+                <h3>Infosys Recruitment Drive</h3>
+                <p>Date: 2 December 2026</p>
+                <p class="tag">Registration Open</p>
+            </div>
+            <div class="drive">
+                <h3>Accenture Campus Drive</h3>
+                <p>Date: 10 December 2026</p>
+                <p class="tag">Upcoming</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>University Placement Cell | Student Placement Portal</p>
+    </footer>
+</body>
+</html>
